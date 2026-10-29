@@ -1,0 +1,2 @@
+-dontwarn **
+-keep class com.srep.novatv.** { *; }
