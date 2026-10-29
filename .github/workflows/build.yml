@@ -1,0 +1,23 @@
+name: Build Nova TV
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Unit tests + debug APK
+        run: gradle --no-daemon test assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NovaTV-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
