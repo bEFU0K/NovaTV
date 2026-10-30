@@ -28,8 +28,14 @@ class App : Application() {
             addDataScheme("package")
         }
         ContextCompat.registerReceiver(this, object : BroadcastReceiver() {
-            override fun onReceive(c: Context, i: Intent) { scope.launch { AppRepo.reload(applicationContext); Protection.enforce(applicationContext) } }
+            override fun onReceive(c: Context, i: Intent) {
+                scope.launch {
+                    try { AppRepo.reload(applicationContext); Protection.enforce(applicationContext) }
+                    catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                    catch (e: Throwable) { AppLog.w("app", "package change", e) }
+                }
+            }
         }, f, ContextCompat.RECEIVER_NOT_EXPORTED)
-        scope.launch { Protection.enforce(applicationContext) }
+        scope.launch { try { Protection.enforce(applicationContext) } catch (e: Throwable) { AppLog.w("app", "enforce", e) } }
     }
 }

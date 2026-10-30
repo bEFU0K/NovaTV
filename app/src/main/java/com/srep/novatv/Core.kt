@@ -49,6 +49,9 @@ object Prefs {
     var setupDone: Boolean
         get() = sp.getBoolean("setup", false)
         set(v) { sp.edit().putBoolean("setup", v).apply() }
+    var setupStep: Int
+        get() = sp.getInt("setup_step", 0)
+        set(v) { sp.edit().putInt("setup_step", v).apply() }
     var accent: Int
         get() = sp.getInt("accent", 0)
         set(v) { sp.edit().putInt("accent", v).apply() }
@@ -127,13 +130,19 @@ object SecureStore {
         "p:" + Base64.encodeToString(plain.toByteArray(), Base64.NO_WRAP)
     }
 
-    fun decrypt(blob: String): String? = try {
-        if (blob.startsWith("p:")) return String(Base64.decode(blob.substring(2), Base64.NO_WRAP))
-        val raw = Base64.decode(blob, Base64.NO_WRAP)
-        val c = Cipher.getInstance("AES/GCM/NoPadding")
-        c.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, raw, 0, 12))
-        String(c.doFinal(raw, 12, raw.size - 12))
-    } catch (e: Exception) {
-        null
+    fun decrypt(blob: String): String? {
+        return try {
+            if (blob.startsWith("p:")) {
+                String(Base64.decode(blob.substring(2), Base64.NO_WRAP))
+            } else {
+                val raw = Base64.decode(blob, Base64.NO_WRAP)
+                val c = Cipher.getInstance("AES/GCM/NoPadding")
+                c.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, raw, 0, 12))
+                String(c.doFinal(raw, 12, raw.size - 12))
+            }
+        } catch (e: Throwable) {
+            AppLog.w("secure", "decrypt failed", e)
+            null
+        }
     }
 }

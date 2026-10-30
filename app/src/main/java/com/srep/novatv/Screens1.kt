@@ -43,7 +43,8 @@ import java.util.Locale
 @Composable
 fun SetupScreen(net: NetState, done: () -> Unit) {
     val ctx = LocalContext.current
-    var step by remember { mutableIntStateOf(0) }
+    var step by remember { mutableIntStateOf(Prefs.setupStep.coerceIn(0, 3)) }
+    LaunchedEffect(step) { Prefs.setupStep = step }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(Modifier.width(760.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(22.dp)) {
             Txt("Nova TV OS", 56, bold = true)
@@ -81,7 +82,7 @@ fun SetupScreen(net: NetState, done: () -> Unit) {
             key(step) {
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     if (step > 0) FocusButton("Назад") { step-- }
-                    FocusButton(if (step < 3) "Далее" else "Готово", primary = true, autoFocus = true) { if (step < 3) step++ else done() }
+                    FocusButton(if (step < 3) "Далее" else "Готово", primary = true, autoFocus = true) { if (step < 3) step++ else { Prefs.setupStep = 0; done() } }
                 }
             }
         }

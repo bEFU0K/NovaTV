@@ -104,9 +104,11 @@ object Provision {
         if (!running.compareAndSet(false, true)) return
         val app = c.applicationContext
         scope.launch {
-            try { runAll(app) } catch (e: Exception) {
+            try { runAll(app) } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
                 AppLog.w("provision", "runAll", e)
-                status.value = "Ошибка: ${e.message ?: "неизвестная"}"
+                status.value = "Ошибка: ${e.message ?: e.javaClass.simpleName}"
             } finally { running.value = false }
         }
     }
@@ -125,13 +127,15 @@ object Provision {
             old
         }
         Prefs.protectedPkgs = items.map { it.pkg }.toSet() + Protection.TAPK_PKG
-        val list = (listOf(tapkItem) + items).map { ProvRow(it) }
+        val list = (listOf(tapkItem) + items).distinctBy { it.id }.map { ProvRow(it) }
         rows.value = list
         for (r in list) {
-            try { process(c, r) } catch (e: Exception) {
+            try { process(c, r) } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
                 AppLog.w("provision", "item ${r.item.id}", e)
                 r.state = PState.Error
-                r.note = e.message ?: "Ошибка"
+                r.note = e.message ?: e.javaClass.simpleName
             }
         }
         val ok = list.all { it.state == PState.Done || it.state == PState.Skipped }

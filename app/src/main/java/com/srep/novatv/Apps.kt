@@ -23,7 +23,14 @@ object AppRepo {
     val apps = MutableStateFlow<List<AppItem>?>(null)
 
     suspend fun reload(c: Context) {
-        apps.value = withContext(Dispatchers.IO) { load(c) }
+        apps.value = try {
+            withContext(Dispatchers.IO) { load(c) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            AppLog.w("apps", "reload", e)
+            apps.value ?: emptyList()
+        }
     }
 
     private fun load(c: Context): List<AppItem> {
