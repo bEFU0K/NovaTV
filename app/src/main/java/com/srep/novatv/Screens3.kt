@@ -10,11 +10,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.media.AudioManager
 import android.net.ConnectivityManager
 import android.os.Build
 import android.provider.Settings
-import android.view.inputmethod.InputMethodManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
@@ -43,61 +41,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
-
-// ---------- Громкость ----------
-@Composable
-fun VolumeScreen(back: () -> Unit) {
-    val ctx = LocalContext.current
-    val am = remember { ctx.getSystemService(AudioManager::class.java) }
-    val stream = AudioManager.STREAM_MUSIC
-    val max = remember { am.getStreamMaxVolume(stream).coerceAtLeast(1) }
-    var vol by remember { mutableIntStateOf(am.getStreamVolume(stream)) }
-    var last by remember { mutableIntStateOf(if (vol > 0) vol else max / 2) }
-    var note by remember { mutableStateOf<String?>(null) }
-    val fixed = remember { try { am.isVolumeFixed } catch (e: Exception) { false } }
-    LaunchedEffect(Unit) { while (true) { vol = am.getStreamVolume(stream); if (vol > 0) last = vol; delay(400) } }
-
-    fun set(v: Int) {
-        try {
-            am.setStreamVolume(stream, v.coerceIn(0, max), 0)
-            note = null
-        } catch (e: Exception) {
-            AppLog.w("volume", "set", e)
-            note = "Система не разрешила изменить громкость"
-        }
-        vol = am.getStreamVolume(stream)
-        if (vol > 0) last = vol
-    }
-
-    val frac by animateFloatAsState(vol.toFloat() / max, tween(160), label = "vol")
-    val accent = LocalAccent.current
-    ScreenFrame("Громкость", back) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Txt(if (vol == 0) "Без звука" else "${vol * 100 / max}%", 64, bold = true)
-            FocusCard(
-                Modifier.fillMaxWidth(), autoFocus = true,
-                onKey = { e ->
-                    if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) { set(vol - 1); true }
-                    else if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight) { set(vol + 1); true }
-                    else false
-                },
-                onClick = { set(if (vol == 0) last else 0) }
-            ) {
-                Box(Modifier.fillMaxWidth().padding(28.dp).height(22.dp).clip(RoundedCornerShape(11.dp)).background(Bg)) {
-                    Box(Modifier.fillMaxWidth(frac.coerceIn(0f, 1f)).fillMaxHeight().background(accent))
-                }
-            }
-            Txt("Стрелки ← → меняют громкость, OK — включить/выключить звук", 16, TextDim)
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                FocusButton("−  тише") { set(vol - 1) }
-                FocusButton("+  громче", primary = true) { set(vol + 1) }
-                FocusButton(if (vol == 0) "Включить звук" else "Без звука") { set(if (vol == 0) last else 0) }
-            }
-            note?.let { Txt(it, 18, Danger) }
-            if (fixed) Txt("Этот ТВ использует фиксированную громкость (усилитель / HDMI-CEC): регулируйте пультом или устройством звука.", 16, TextDim)
-        }
-    }
-}
 
 // ---------- Сеть ----------
 object NetInfo {
@@ -147,29 +90,6 @@ fun NetworkScreen(net: NetState, back: () -> Unit) {
             }
             result?.let { Txt(it, 20, if (it.startsWith("Нет")) Danger else TextMain) }
             Txt("Ethernet подключается сам при вставленном кабеле. Пароль Wi-Fi вводится в системном окне Android: приложение без системных прав не может подключать к сети напрямую.", 14, TextDim)
-        }
-    }
-}
-
-// ---------- Клавиатура ----------
-@Composable
-fun KeyboardScreen(back: () -> Unit) {
-    val ctx = LocalContext.current
-    var text by remember { mutableStateOf("") }
-    ScreenFrame("Клавиатура", back) {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FocusButton("Выбрать клавиатуру системы") {
-                    try { ctx.getSystemService(InputMethodManager::class.java).showInputMethodPicker() }
-                    catch (e: Exception) { Sys.open(ctx, Settings.ACTION_INPUT_METHOD_SETTINGS) }
-                }
-                FocusButton("Настройки клавиатуры") { Sys.open(ctx, Settings.ACTION_INPUT_METHOD_SETTINGS) }
-            }
-            Txt("Экранная клавиатура Nova (RU / EN) — используется в Nova для ввода имён и текста. Проверьте её здесь:", 17, TextDim)
-            Box(Modifier.fillMaxWidth().background(Surface, RoundedCornerShape(12.dp)).padding(16.dp)) {
-                Txt(if (text.isEmpty()) "Введите текст…" else text + "▏", 24, if (text.isEmpty()) TextDim else TextMain)
-            }
-            OnScreenKeyboard({ text += it }, { text = text.dropLast(1) }, { text = "" }, enterLabel = "Очистить", autoFocus = false)
         }
     }
 }

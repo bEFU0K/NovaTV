@@ -172,7 +172,6 @@ fun SettingsScreen(ui: UiState, session: Session?, go: (Screen) -> Unit, back: (
     val items = buildList<Pair<String, () -> Unit>> {
         add("Интернет: Wi-Fi / Ethernet" to { go(Screen.Network) })
         if (hasBt) add("Bluetooth" to { go(Screen.Bluetooth) })
-        add("Громкость" to { go(Screen.Volume) })
         add("Файлы" to { go(Screen.Files) })
         add("Установка APK" to { go(Screen.Apk) })
         add("Системные приложения" to { go(Screen.Provision) })

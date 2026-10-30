@@ -55,7 +55,7 @@ val WallpaperNames = listOf("Фон + синее свечение", "Фон + ф
 val CardSizeNames = listOf("Компактные", "Средние", "Крупные")
 val LocalAccent = compositionLocalOf { Accents[0] }
 
-enum class Screen { Setup, Login, Provision, Home, Apps, Apk, Vpn, Settings, About, Update, Diagnostics, Files, Bluetooth, Volume, Network, Keyboard }
+enum class Screen { Setup, Login, Provision, Home, Apps, Apk, Vpn, Settings, About, Update, Diagnostics, Files, Bluetooth, Network }
 
 class UiState {
     var accent by mutableIntStateOf(Prefs.accent)

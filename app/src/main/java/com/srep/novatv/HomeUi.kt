@@ -1,6 +1,5 @@
 package com.srep.novatv
 
-import android.media.AudioManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -127,10 +126,6 @@ fun HomeScreen(ui: UiState, apps: List<AppItem>?, net: NetState, vpn: Boolean, u
             enter = slideInHorizontally(tween(320)) { it } + fadeIn(tween(220)),
             exit = slideOutHorizontally(tween(260)) { it } + fadeOut(tween(200))
         ) {
-            val am = remember { ctx.getSystemService(AudioManager::class.java) }
-            val volText = remember {
-                try { "${am.getStreamVolume(AudioManager.STREAM_MUSIC) * 100 / am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)}%" } catch (e: Exception) { "" }
-            }
             Column(
                 Modifier.width(400.dp).fillMaxHeight()
                     .background(Brush.verticalGradient(listOf(Color(0xF2122244), Color(0xF20A1226))), RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp))
@@ -152,7 +147,6 @@ fun HomeScreen(ui: UiState, apps: List<AppItem>?, net: NetState, vpn: Boolean, u
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                PanelRow(Ic.Volume, "Громкость", volText) { open(Screen.Volume) }
                 PanelRow(Ic.Wifi, "Интернет", if (net.online) net.type else "Нет сети") { open(Screen.Network) }
                 PanelRow(Ic.Bluetooth, "Bluetooth", "Пульты, наушники") { open(Screen.Bluetooth) }
                 PanelRow(Ic.Shield, "VPN", if (vpn) "Включён" else "Выключен") { open(Screen.Vpn) }
