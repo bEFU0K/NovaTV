@@ -36,7 +36,7 @@ android {
         // Сборка без отладочного режима и с оптимизацией — на слабых приставках (Eltex) работает в разы плавнее
         debug {
             isDebuggable = false
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         release {

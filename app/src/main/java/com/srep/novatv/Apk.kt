@@ -36,7 +36,11 @@ object InstallEvents {
 
 object ApkInstaller {
 
-    fun canInstall(c: Context) = c.packageManager.canRequestPackageInstalls()
+    fun canInstall(c: Context): Boolean =
+        try {
+            if (Build.VERSION.SDK_INT >= 26) c.packageManager.canRequestPackageInstalls()
+            else @Suppress("DEPRECATION") (android.provider.Settings.Secure.getInt(c.contentResolver, android.provider.Settings.Secure.INSTALL_NON_MARKET_APPS, 0) == 1)
+        } catch (e: Throwable) { true }
 
     fun inspectUri(c: Context, uri: Uri): ApkInfo {
         val name = c.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)

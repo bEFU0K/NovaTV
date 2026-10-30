@@ -22,8 +22,10 @@ object Sys {
     /** Открывает системный экран настроек; если его нет на устройстве — общие настройки + понятное сообщение. */
     fun open(c: Context, action: String, pkg: String? = null): Boolean {
         return try {
-            val i = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            if (pkg != null) i.data = Uri.parse("package:$pkg")
+            // На Android 7 «Неизвестные источники» — общий переключатель в «Безопасности», а не по приложениям
+            val legacy = action == Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES && android.os.Build.VERSION.SDK_INT < 26
+            val i = Intent(if (legacy) Settings.ACTION_SECURITY_SETTINGS else action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (pkg != null && !legacy) i.data = Uri.parse("package:$pkg")
             c.startActivity(i)
             true
         } catch (e: Exception) {
@@ -56,7 +58,9 @@ object NetMonitor {
                         caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Мобильная сеть"
                         else -> "Сеть"
                     }
-                    state.value = NetState(caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED), t)
+                    // VALIDATED не используем: на Android 7 и в сетях, где заблокирована проверка Google (generate_204),
+                    // он остаётся false при рабочем интернете. Достаточно наличия сети с доступом в интернет.
+                    state.value = NetState(caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET), t)
                 }
 
                 override fun onLost(n: Network) { state.value = NetState(false, "Нет сети") }

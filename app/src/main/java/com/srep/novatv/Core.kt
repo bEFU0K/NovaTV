@@ -116,14 +116,19 @@ object SecureStore {
         return g.generateKey()
     }
 
-    fun encrypt(plain: String): String {
+    fun encrypt(plain: String): String = try {
         val c = Cipher.getInstance("AES/GCM/NoPadding")
         c.init(Cipher.ENCRYPT_MODE, key())
         val ct = c.doFinal(plain.toByteArray())
-        return Base64.encodeToString(c.iv + ct, Base64.NO_WRAP)
+        Base64.encodeToString(c.iv + ct, Base64.NO_WRAP)
+    } catch (e: Throwable) {
+        // На некоторых приставках (старые Android) хранилище ключей работает нестабильно — не роняем приложение.
+        AppLog.w("secure", "keystore недоступен, сессия сохранена без шифрования", e)
+        "p:" + Base64.encodeToString(plain.toByteArray(), Base64.NO_WRAP)
     }
 
     fun decrypt(blob: String): String? = try {
+        if (blob.startsWith("p:")) return String(Base64.decode(blob.substring(2), Base64.NO_WRAP))
         val raw = Base64.decode(blob, Base64.NO_WRAP)
         val c = Cipher.getInstance("AES/GCM/NoPadding")
         c.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, raw, 0, 12))
