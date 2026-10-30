@@ -55,6 +55,9 @@ val WallpaperNames = listOf("Фон + синее свечение", "Фон + ф
 val CardSizeNames = listOf("Компактные", "Средние", "Крупные")
 val LocalAccent = compositionLocalOf { Accents[0] }
 
+/** Сколько карточек Nova сейчас в фокусе (0 — фокуса нет, стрелки пульта ничего не делают). */
+object FocusTracker { @Volatile var count = 0 }
+
 enum class Screen { Setup, Login, Provision, Home, Apps, Apk, Vpn, Settings, About, Update, Diagnostics, Files, Bluetooth, Network }
 
 class UiState {
@@ -123,15 +126,21 @@ fun FocusCard(
     content: @Composable BoxScope.(Boolean) -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.04f else 1f, tween(110), label = "focusScale")
+    val scale by animateFloatAsState(if (focused) 1.06f else 1f, tween(110), label = "focusScale")
     val accent = LocalAccent.current
     val bgColor by animateColorAsState(if (focused) SurfaceFocus else Surface, tween(100), label = "focusBg")
     val fr = remember { FocusRequester() }
+    val had = remember { BooleanArray(1) }
+    DisposableEffect(Unit) { onDispose { if (had[0]) { had[0] = false; FocusTracker.count = (FocusTracker.count - 1).coerceAtLeast(0) } } }
     if (autoFocus) LaunchedEffect(Unit) { try { fr.requestFocus() } catch (_: Exception) { } }
     var m = modifier.zIndex(if (focused) 1f else 0f).scale(scale).focusRequester(fr)
     if (onKey != null) m = m.onPreviewKeyEvent(onKey)
     Box(
-        m.onFocusChanged { focused = it.isFocused }
+        m.onFocusChanged {
+            val now = it.isFocused
+            if (now != had[0]) { had[0] = now; FocusTracker.count = (FocusTracker.count + (if (now) 1 else -1)).coerceAtLeast(0) }
+            focused = now
+        }
             .clip(shape)
             .background(bgColor)
             .border(if (focused) 3.dp else 0.dp, if (focused) accent else Color.Transparent, shape)

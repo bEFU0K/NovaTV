@@ -32,17 +32,40 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 private fun IconTile(ic: Ic, title: String, sub: String, onClick: () -> Unit) {
-    FocusCard(Modifier.width(250.dp), onClick = onClick) { f ->
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(Modifier.size(52.dp).background(LocalAccent.current.copy(alpha = if (f) 0.40f else 0.20f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-                NovaIcon(ic, 30.dp)
-            }
-            Column {
-                Txt(title, 21, bold = true, maxLines = 1)
-                Spacer(Modifier.height(3.dp))
-                Txt(sub, 13, TextDim, maxLines = 1)
+    val accent = LocalAccent.current
+    FocusCard(Modifier.width(260.dp), RoundedCornerShape(22.dp), onClick = onClick) { f ->
+        Box(Modifier.background(Brush.linearGradient(listOf(accent.copy(alpha = if (f) 0.38f else 0.18f), Color.Transparent)))) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(
+                    Modifier.size(60.dp).background(accent.copy(alpha = if (f) 0.50f else 0.26f), RoundedCornerShape(18.dp)),
+                    contentAlignment = Alignment.Center
+                ) { NovaIcon(ic, 34.dp) }
+                Column {
+                    Txt(title, 22, bold = true, maxLines = 1)
+                    Spacer(Modifier.height(3.dp))
+                    Txt(sub, 14, TextDim, maxLines = 1)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String, trailing: (@Composable RowScope.() -> Unit)? = null) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Box(Modifier.size(width = 5.dp, height = 26.dp).background(LocalAccent.current, RoundedCornerShape(3.dp)))
+        Txt(text, 26, bold = true)
+        trailing?.invoke(this)
+    }
+}
+
+private fun greeting(): String {
+    val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+    return when {
+        h in 5..11 -> "Доброе утро"
+        h in 12..17 -> "Добрый день"
+        h in 18..22 -> "Добрый вечер"
+        else -> "Доброй ночи"
     }
 }
 
@@ -81,7 +104,10 @@ fun HomeScreen(ui: UiState, apps: List<AppItem>?, net: NetState, vpn: Boolean, u
             verticalArrangement = Arrangement.spacedBy(22.dp)
         ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Clock()
+                Column {
+                    Clock()
+                    Txt(greeting() + (if (user != null) ", ${user.name}" else ""), 20, TextDim, maxLines = 1)
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Chip(if (net.online) net.type else "Нет сети", net.online)
                     Chip(if (vpn) "VPN включён" else "VPN выключен", vpn)
@@ -90,13 +116,15 @@ fun HomeScreen(ui: UiState, apps: List<AppItem>?, net: NetState, vpn: Boolean, u
                     }
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Txt("Избранное", 24, bold = true)
+            SectionTitle("Избранное") {
                 FocusButton(if (ui.edit) "Готово" else "Изменить порядок") { ui.edit = !ui.edit }
                 if (ui.edit) Txt("← → переместить выбранное приложение", 15, TextDim)
             }
-            if (favs.isEmpty()) Txt("Пусто. Откройте «Все приложения» и выберите «В избранное».", 16, TextDim)
-            else LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
+            if (favs.isEmpty()) {
+                Box(Modifier.fillMaxWidth().background(Surface, RoundedCornerShape(18.dp)).padding(22.dp)) {
+                    Txt("Пока пусто. Откройте «Все приложения» и выберите «В избранное».", 18, TextDim)
+                }
+            } else LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
                 items(favs, key = { it.pkg }) { a ->
                     AppCard(a, ui.cardW, onKey = { e ->
                         if (ui.edit && e.type == KeyEventType.KeyDown && (e.key == Key.DirectionLeft || e.key == Key.DirectionRight)) {
@@ -106,15 +134,19 @@ fun HomeScreen(ui: UiState, apps: List<AppItem>?, net: NetState, vpn: Boolean, u
                 }
             }
             if (recents.isNotEmpty()) {
-                Txt("Недавние", 24, bold = true)
+                SectionTitle("Недавние")
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
                     items(recents, key = { it.pkg }) { a -> AppCard(a, ui.cardW) { launchApp(ctx, ui, a) } }
                 }
             }
+            SectionTitle("Быстрый доступ")
             LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
                 item { IconTile(Ic.Apps, "Все приложения", "Запуск, избранное") { go(Screen.Apps) } }
                 item { IconTile(Ic.Files, "Файлы", "Память, USB") { go(Screen.Files) } }
+                item { IconTile(Ic.Install, "Установка APK", "APK, XAPK, APKS") { go(Screen.Apk) } }
+                item { IconTile(Ic.Wifi, "Интернет", if (net.online) net.type else "Нет сети") { go(Screen.Network) } }
                 item { IconTile(Ic.Lock, "Системные", if (Prefs.provisionDone) "Установлены" else "Нужна установка") { go(Screen.Provision) } }
+                item { IconTile(Ic.Gear, "Настройки", "Фон, акцент, система") { go(Screen.Settings) } }
             }
         }
 

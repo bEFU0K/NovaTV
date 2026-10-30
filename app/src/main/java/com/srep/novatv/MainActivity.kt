@@ -18,7 +18,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
@@ -27,6 +29,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        StartupSound.playOnce(applicationContext)
         setContent { NovaApp(homeSignal, resumeSignal) }
     }
 
@@ -78,6 +81,29 @@ fun NovaApp(homeSignal: Int, resumeSignal: Int = 0) {
 
     LaunchedEffect(homeSignal) { if (homeSignal > 0 && Prefs.setupDone && session != null) screen = Screen.Home }
     LaunchedEffect(Unit) { AppRepo.reload(ctx.applicationContext) }
+    val focusManager = LocalFocusManager.current
+    // Если после смены экрана ни одна кнопка не в фокусе — отдаём фокус первой (иначе пульт «не работает»).
+    LaunchedEffect(shown, homeSignal) {
+        repeat(8) {
+            kotlinx.coroutines.delay(350)
+            if (FocusTracker.count > 0) return@LaunchedEffect
+            try { focusManager.moveFocus(FocusDirection.Next) } catch (e: Exception) { AppLog.w("focus", "initial", e) }
+        }
+    }
+    // После возврата из приложения Compose считает, что фокус «ещё у плитки», а система его уже забрала: сбрасываем и ставим заново.
+    LaunchedEffect(resumeSignal) {
+        if (resumeSignal == 0) return@LaunchedEffect
+        kotlinx.coroutines.delay(300)
+        try { focusManager.clearFocus(force = true) } catch (e: Exception) { AppLog.w("focus", "clear", e) }
+        FocusTracker.count = 0
+        repeat(8) {
+            kotlinx.coroutines.delay(250)
+            if (FocusTracker.count > 0) return@LaunchedEffect
+            try { focusManager.moveFocus(FocusDirection.Next) } catch (e: Exception) { AppLog.w("focus", "resume", e) }
+        }
+    }
+    LaunchedEffect(Unit) { while (true) { NetMonitor.refresh(); kotlinx.coroutines.delay(3000) } }
+
     // Автовосстановление сессии: обновляем токен до истечения; при сетевой ошибке сессию не трогаем.
     LaunchedEffect(session?.access, net.online) {
         val s = session ?: return@LaunchedEffect

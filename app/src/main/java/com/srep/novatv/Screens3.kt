@@ -10,9 +10,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.net.ConnectivityManager
 import android.os.Build
 import android.provider.Settings
+import android.view.inputmethod.InputMethodManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
@@ -86,7 +88,7 @@ fun NetworkScreen(net: NetState, back: () -> Unit) {
                 FocusButton("Другие сети") { Sys.open(ctx, Settings.ACTION_WIRELESS_SETTINGS) }
             }
             FocusButton(if (busy) "Проверяем…" else "Проверить интернет и Srepportal") {
-                if (!busy) scope.launch { busy = true; result = NetInfo.checkPortal(); busy = false }
+                if (!busy) scope.launch { busy = true; result = NetInfo.checkPortal(); if (result?.contains("HTTP") == true) NetMonitor.markOnline(); busy = false }
             }
             result?.let { Txt(it, 20, if (it.startsWith("Нет")) Danger else TextMain) }
             Txt("Ethernet подключается сам при вставленном кабеле. Пароль Wi-Fi вводится в системном окне Android: приложение без системных прав не может подключать к сети напрямую.", 14, TextDim)

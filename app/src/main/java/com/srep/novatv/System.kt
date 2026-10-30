@@ -45,26 +45,43 @@ data class NetState(val online: Boolean = false, val type: String = "Нет се
 
 object NetMonitor {
     val state = MutableStateFlow(NetState())
+    private var cm: ConnectivityManager? = null
+
+    private fun typeOf(caps: NetworkCapabilities) = when {
+        caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
+        caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
+        caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> "VPN"
+        caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Мобильная сеть"
+        else -> "Сеть"
+    }
+
+    /** Пересчитывает состояние по текущей активной сети (не зависит от порядка событий). */
+    fun refresh() {
+        val m = cm ?: return
+        try {
+            val n = m.activeNetwork
+            val caps = if (n != null) m.getNetworkCapabilities(n) else null
+            // VALIDATED не используем: на ТВ/в сетях без проверки Google он остаётся false при рабочем интернете.
+            state.value = if (caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+                NetState(true, typeOf(caps)) else NetState(false, "Нет сети")
+        } catch (e: Exception) {
+            AppLog.w("net", "refresh", e)
+        }
+    }
+
+    /** Если реальный запрос к серверу прошёл — интернет точно есть. */
+    fun markOnline() { if (!state.value.online) state.value = NetState(true, state.value.type.takeIf { it != "Нет сети" } ?: "Сеть") }
 
     fun start(c: Context) {
         try {
-            val cm = c.getSystemService(ConnectivityManager::class.java)
-            cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-                override fun onCapabilitiesChanged(n: Network, caps: NetworkCapabilities) {
-                    val t = when {
-                        caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
-                        caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
-                        caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> "VPN"
-                        caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Мобильная сеть"
-                        else -> "Сеть"
-                    }
-                    // VALIDATED не используем: на Android 7 и в сетях, где заблокирована проверка Google (generate_204),
-                    // он остаётся false при рабочем интернете. Достаточно наличия сети с доступом в интернет.
-                    state.value = NetState(caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET), t)
-                }
-
-                override fun onLost(n: Network) { state.value = NetState(false, "Нет сети") }
+            val m = c.getSystemService(ConnectivityManager::class.java)
+            cm = m
+            m.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(n: Network) { refresh() }
+                override fun onCapabilitiesChanged(n: Network, caps: NetworkCapabilities) { refresh() }
+                override fun onLost(n: Network) { refresh() }
             })
+            refresh()
         } catch (e: Exception) {
             AppLog.w("net", "register", e)
         }

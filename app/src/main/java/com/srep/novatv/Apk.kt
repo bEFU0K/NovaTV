@@ -61,7 +61,14 @@ object ApkInstaller {
             else -> throw ApkException("Неподдерживаемый файл. Нужен .apk, .apks, .xapk или .apkm")
         }
         if (parts.isEmpty()) throw ApkException("В пакете нет APK-файлов")
-        val base = parts.firstOrNull { it.name.equals("base.apk", true) } ?: parts.maxByOrNull { it.length() }!!
+        // Основной файл — это НЕ «самый большой»: у YouTube ТВ файл с кодом под процессор (config.*) больше основного,
+        // и раньше он ошибочно принимался за основной → «файл повреждён». Файлы config.* / split_* — только дополнения.
+        val base = parts.firstOrNull { it.name.equals("base.apk", true) }
+            ?: parts.filter { f ->
+                val n = f.name.lowercase()
+                !n.startsWith("config.") && !n.startsWith("split_") && !n.startsWith("split.")
+            }.maxByOrNull { it.length() }
+            ?: parts.maxByOrNull { it.length() }!!
         val pm = c.packageManager
         val pi = pm.getPackageArchiveInfo(base.absolutePath, PackageManager.GET_PERMISSIONS)
             ?: throw ApkException("Файл повреждён или не является Android-приложением")
