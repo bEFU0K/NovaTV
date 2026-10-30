@@ -1,0 +1,60 @@
+{
+  "apps": [
+    {
+      "id": "yandex-music",
+      "name": "Яндекс Музыка",
+      "pkg": "ru.yandex.music",
+      "ext": "apk",
+      "size": 62886441,
+      "sha256": "fa1055e23c164849c6e0a375dcca47ece991ab1430c09dc4daaa192e1d6df810",
+      "min_sdk": 24,
+      "abis": []
+    },
+    {
+      "id": "youtube",
+      "name": "YouTube для ТВ",
+      "pkg": "com.google.android.youtube.tv",
+      "ext": "xapk",
+      "size": 47662995,
+      "sha256": "35a5fcff9e5fdd1001693783c82c9ee8e1d2d64bd6f9fffca07382dc93be8f77",
+      "min_sdk": 24,
+      "abis": [
+        "armeabi-v7a"
+      ]
+    },
+    {
+      "id": "premier",
+      "name": "PREMIER",
+      "pkg": "gpm.tnt_premier",
+      "ext": "xapk",
+      "size": 47477175,
+      "sha256": "7b92577812d927659ec5b0269eacb7d406b13533dd784d563044cfcfc654fc36",
+      "min_sdk": 24,
+      "abis": [
+        "armeabi-v7a"
+      ]
+    },
+    {
+      "id": "happ",
+      "name": "Happ — VPN / прокси",
+      "pkg": "su.happ.proxyutility",
+      "ext": "apk",
+      "size": 66864754,
+      "sha256": "47aac2a2310553ca85ef390c2ae1674d79d9d70c215ef36a35cdf433f5b8323d",
+      "min_sdk": 24,
+      "abis": []
+    },
+    {
+      "id": "yandex-browser",
+      "name": "Яндекс Браузер для ТВ",
+      "pkg": "com.yandex.browser.tv",
+      "ext": "xapk",
+      "size": 20572701,
+      "sha256": "5d772c5b369766e7e358423dbf88816bf28d77e11899f5c709f6b8c7dfb7c85d",
+      "min_sdk": 24,
+      "abis": [
+        "armeabi-v7a"
+      ]
+    }
+  ]
+}

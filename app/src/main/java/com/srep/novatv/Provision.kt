@@ -47,10 +47,20 @@ object Provision {
     val rows = MutableStateFlow<List<ProvRow>>(emptyList())
     val running = MutableStateFlow(false)
     val status = MutableStateFlow("")
+    /** Растёт, когда список приложений на сервере обновился — по нему Nova решает, не появилось ли что-то новое. */
+    val manifestTick = MutableStateFlow(0)
 
     private val base get() = BuildConfig.PORTAL_URL.trimEnd('/')
 
     val tapkItem = ProvItem("tapk", "TAPK — установщик XAPK", Protection.TAPK_PKG, "apk", 0L, "", 21, emptyList())
+    val happItem = ProvItem("happ", "Happ — VPN / прокси", "su.happ.proxyutility", "apk", 0L, "", 21, emptyList())
+
+    private fun hasAsset(c: Context, name: String): Boolean =
+        try { c.assets.list("")?.contains(name) == true } catch (e: Exception) { false }
+
+    /** Приложения, вшитые в Nova (assets/<id>.apk): TAPK всегда, Happ — если файл assets/happ.apk положен в проект. */
+    fun bundled(c: Context): List<ProvItem> =
+        listOf(tapkItem) + (if (hasAsset(c, "happ.apk")) listOf(happItem) else emptyList())
 
     fun parse(json: String): List<ProvItem> {
         val a = JSONObject(json).getJSONArray("apps")
@@ -70,9 +80,9 @@ object Provision {
     fun missing(c: Context): List<ProvItem> {
         val skip = Prefs.skippedIds
         val list = ArrayList<ProvItem>()
-        if (!Protection.isInstalled(c, Protection.TAPK_PKG)) list.add(tapkItem)
+        bundled(c).filter { !Protection.isInstalled(c, it.pkg) }.forEach { list.add(it) }
         cached().filter { it.id !in skip && !Protection.isInstalled(c, it.pkg) }.forEach { list.add(it) }
-        return list
+        return list.distinctBy { it.id }
     }
 
     private fun http(path: String, token: String): HttpURLConnection {
@@ -98,6 +108,29 @@ object Provision {
         val txt = c.inputStream.bufferedReader().use { it.readText() }
         c.disconnect()
         return txt
+    }
+
+    /**
+     * Тихо обновляет список приложений с сервера (без скачивания самих файлов).
+     * Благодаря этому новые приложения, добавленные на сайт, предлагаются к установке после обновления Nova,
+     * а исправленные записи (например, другое имя пакета) подхватываются без переустановки.
+     */
+    fun refreshManifest(c: Context) {
+        if (running.value) return
+        try {
+            val txt = fetchManifest()
+            val parsed = parse(txt)
+            if (txt != Prefs.manifest) {
+                Prefs.manifest = txt
+                Prefs.protectedPkgs = parsed.map { it.pkg }.toSet() + bundled(c).map { it.pkg }
+                manifestTick.value = manifestTick.value + 1
+            }
+            Protection.enforce(c)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            AppLog.w("provision", "refreshManifest: ${e.message}")
+        }
     }
 
     fun start(c: Context) {
@@ -126,8 +159,8 @@ object Provision {
             status.value = "Нет связи с сервером — используем сохранённый список"
             old
         }
-        Prefs.protectedPkgs = items.map { it.pkg }.toSet() + Protection.TAPK_PKG
-        val list = (listOf(tapkItem) + items).distinctBy { it.id }.map { ProvRow(it) }
+        Prefs.protectedPkgs = items.map { it.pkg }.toSet() + bundled(c).map { it.pkg }
+        val list = (bundled(c) + items).distinctBy { it.id }.map { ProvRow(it) }
         rows.value = list
         for (r in list) {
             try { process(c, r) } catch (e: kotlinx.coroutines.CancellationException) {
@@ -153,7 +186,7 @@ object Provision {
         if (p.abis.isNotEmpty() && !Util.abiCompatible(p.abis.toSet(), Build.SUPPORTED_ABIS)) {
             skip(r, "Только для ${p.abis.joinToString()}, ТВ: ${Build.SUPPORTED_ABIS.joinToString()}"); return
         }
-        val file: File = if (p.id == "tapk") copyTapk(c) else { r.state = PState.Download; download(c, p, r) }
+        val file: File = if (bundled(c).any { it.id == p.id }) copyAsset(c, p.id) else { r.state = PState.Download; download(c, p, r) }
         r.state = PState.Install
         r.note = "Подтвердите установку в окне Android"
         val info = ApkInstaller.inspect(c, file, "${p.id}.${p.ext}")
@@ -170,9 +203,9 @@ object Provision {
 
     private fun skip(r: ProvRow, why: String) { r.state = PState.Skipped; r.note = why }
 
-    private fun copyTapk(c: Context): File {
-        val f = File(c.cacheDir, "tapk.apk")
-        c.assets.open("tapk.apk").use { i -> f.outputStream().use { o -> i.copyTo(o) } }
+    private fun copyAsset(c: Context, id: String): File {
+        val f = File(c.cacheDir, "$id.apk")
+        c.assets.open("$id.apk").use { i -> f.outputStream().use { o -> i.copyTo(o) } }
         return f
     }
 

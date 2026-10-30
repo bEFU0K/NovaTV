@@ -44,11 +44,20 @@ object AppLog {
 /** Настройки лаунчера. Токены здесь хранятся только в зашифрованном виде (см. SecureStore). */
 object Prefs {
     private lateinit var sp: SharedPreferences
-    fun init(c: Context) { sp = c.getSharedPreferences("nova", Context.MODE_PRIVATE) }
+    fun init(c: Context) {
+        sp = c.getSharedPreferences("nova", Context.MODE_PRIVATE)
+        SettingsBackup.attach(c, sp)
+    }
 
     var setupDone: Boolean
         get() = sp.getBoolean("setup", false)
         set(v) { sp.edit().putBoolean("setup", v).apply() }
+    var soundBoot: Int
+        get() = sp.getInt("sound_boot", -1)
+        set(v) { sp.edit().putInt("sound_boot", v).apply() }
+    var soundAt: Long
+        get() = sp.getLong("sound_at", Long.MAX_VALUE)
+        set(v) { sp.edit().putLong("sound_at", v).apply() }
     var setupStep: Int
         get() = sp.getInt("setup_step", 0)
         set(v) { sp.edit().putInt("setup_step", v).apply() }

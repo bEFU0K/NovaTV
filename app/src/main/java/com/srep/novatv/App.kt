@@ -16,8 +16,8 @@ class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        Prefs.init(this)
         AppLog.init(this)
+        Prefs.init(this)
         SessionStore.load()
         NetMonitor.start(this)
         VpnMonitor.start(this)

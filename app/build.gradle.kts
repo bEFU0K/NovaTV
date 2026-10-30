@@ -12,8 +12,10 @@ android {
         applicationId = "com.srep.novatv"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        // Номер сборки растёт сам при каждом запуске GitHub Actions — новая сборка всегда ставится ПОВЕРХ старой
+        val build = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1).coerceAtLeast(1)
+        versionCode = 100 + build
+        versionName = "1.1.$build"
         // Переопределяются: gradle -PportalUrl=https://... -PupdateUrl=https://.../update.json
         val portal = providers.gradleProperty("portalUrl").orElse("https://srepportal.craft-host.ru").get()
         val upd = providers.gradleProperty("updateUrl").orElse("").get()
@@ -21,14 +23,21 @@ android {
         buildConfigField("String", "UPDATE_URL", "\"$upd\"")
     }
 
+    // ВАЖНО: подпись всегда одна и та же. Иначе Android не даёт обновить приложение «поверх»
+    // (приходится удалять — и все данные пропадают). Файл app/novatv.keystore ОБЯЗАТЕЛЬНО держите в репозитории.
     val ksPath = System.getenv("KEYSTORE_PATH")
-    if (ksPath != null) {
-        signingConfigs {
-            create("release") {
+    signingConfigs {
+        create("nova") {
+            if (ksPath != null) {
                 storeFile = file(ksPath)
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
+            } else {
+                storeFile = file("novatv.keystore")
+                storePassword = "novatv-sign"
+                keyAlias = "novatv"
+                keyPassword = "novatv-sign"
             }
         }
     }
@@ -37,11 +46,12 @@ android {
         debug {
             isDebuggable = false
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("nova")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         release {
             isMinifyEnabled = false
-            if (ksPath != null) signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("nova")
         }
     }
     buildFeatures { compose = true; buildConfig = true }

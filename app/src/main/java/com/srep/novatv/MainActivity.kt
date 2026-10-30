@@ -18,15 +18,29 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
     private var homeSignal by mutableIntStateOf(0)
+    private var resumeSignal by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { NovaApp(homeSignal) }
+        StartupSound.playOnce(applicationContext)
+        setContent { NovaApp(homeSignal, resumeSignal) }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        resumeSignal++ // вернулись из другого приложения — заново отдаём фокус плиткам
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) resumeSignal++
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -36,13 +50,14 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun NovaApp(homeSignal: Int) {
+fun NovaApp(homeSignal: Int, resumeSignal: Int = 0) {
     val ctx = LocalContext.current
     val ui = remember { UiState() }
     val apps by AppRepo.apps.collectAsState()
     val net by NetMonitor.state.collectAsState()
     val vpn by VpnMonitor.active.collectAsState()
     val session by SessionStore.flow.collectAsState()
+    val manifestTick by Provision.manifestTick.collectAsState()
 
     var screen by remember {
         mutableStateOf(
@@ -66,6 +81,28 @@ fun NovaApp(homeSignal: Int) {
 
     LaunchedEffect(homeSignal) { if (homeSignal > 0 && Prefs.setupDone && session != null) screen = Screen.Home }
     LaunchedEffect(Unit) { AppRepo.reload(ctx.applicationContext) }
+    val focusManager = LocalFocusManager.current
+    // Если после смены экрана ни одна кнопка не в фокусе — отдаём фокус первой (иначе пульт «не работает»).
+    LaunchedEffect(shown, homeSignal) {
+        repeat(8) {
+            kotlinx.coroutines.delay(350)
+            if (FocusTracker.count > 0) return@LaunchedEffect
+            try { focusManager.moveFocus(FocusDirection.Next) } catch (e: Exception) { AppLog.w("focus", "initial", e) }
+        }
+    }
+    // После возврата из приложения Compose считает, что фокус «ещё у плитки», а система его уже забрала: сбрасываем и ставим заново.
+    LaunchedEffect(resumeSignal) {
+        if (resumeSignal == 0) return@LaunchedEffect
+        kotlinx.coroutines.delay(300)
+        try { focusManager.clearFocus(force = true) } catch (e: Exception) { AppLog.w("focus", "clear", e) }
+        FocusTracker.count = 0
+        repeat(8) {
+            kotlinx.coroutines.delay(250)
+            if (FocusTracker.count > 0) return@LaunchedEffect
+            try { focusManager.moveFocus(FocusDirection.Next) } catch (e: Exception) { AppLog.w("focus", "resume", e) }
+        }
+    }
+    LaunchedEffect(Unit) { while (true) { NetMonitor.refresh(); kotlinx.coroutines.delay(3000) } }
 
     // Автовосстановление сессии: обновляем токен до истечения; при сетевой ошибке сессию не трогаем.
     LaunchedEffect(session?.access, net.online) {
@@ -82,7 +119,12 @@ fun NovaApp(homeSignal: Int) {
     }
 
     // Если системное приложение удалили — предлагаем сразу скачать и поставить его заново.
-    LaunchedEffect(apps) {
+    // После обновления Nova (и при каждом запуске) тихо сверяем список приложений с сайтом: новое — предложим поставить.
+    LaunchedEffect(session?.user?.id, net.online) {
+        if (session == null || !net.online || !Prefs.provisionDone) return@LaunchedEffect
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { Provision.refreshManifest(ctx.applicationContext) }
+    }
+    LaunchedEffect(apps, manifestTick) {
         if (!Prefs.setupDone || session == null || apps == null || !Prefs.provisionDone) return@LaunchedEffect
         val m = Provision.missing(ctx)
         if (m.isEmpty()) restoreShown = false
@@ -122,9 +164,7 @@ fun NovaApp(homeSignal: Int) {
                     Screen.Diagnostics -> DiagnosticsScreen(net, vpn, home)
                     Screen.Files -> FilesScreen(home)
                     Screen.Bluetooth -> BluetoothScreen(back = { screen = if (session == null) Screen.Login else Screen.Home })
-                    Screen.Volume -> VolumeScreen(home)
                     Screen.Network -> NetworkScreen(net, back = { screen = if (session == null) Screen.Login else Screen.Home })
-                    Screen.Keyboard -> KeyboardScreen(home)
                 }
             }
             if (!net.online && shown != Screen.Setup && shown != Screen.Diagnostics && shown != Screen.Network) {
